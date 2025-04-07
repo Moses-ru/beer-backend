@@ -22,7 +22,7 @@ async def cmd_start(message: types.Message):
 async def cmd_play(message: types.Message):
     await bot.send_game(
         chat_id=message.chat.id,
-        game_short_name="beer_clicker"
+        game_short_name="beer_stack"
     )
 
 # Flask: получение очков
