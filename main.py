@@ -1,5 +1,6 @@
 import os
 import asyncio
+import threading
 from flask import Flask, request, jsonify
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import BotCommand
@@ -22,10 +23,10 @@ async def cmd_start(message: types.Message):
 async def cmd_play(message: types.Message):
     await bot.send_game(
         chat_id=message.chat.id,
-        game_short_name="beer_stack"
+        game_short_name="beer_clicker"
     )
 
-# Flask: получение очков
+# Flask: приём очков
 @app.route("/api/score", methods=["POST"])
 def receive_score():
     data = request.json
@@ -53,18 +54,19 @@ def receive_score():
 def home():
     return "🏓 Bot is up and running!"
 
-# Запуск
+# 🔁 Асинхронный запуск aiogram polling
+async def start_bot():
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Запуск"),
+        BotCommand(command="play", description="Играть в Beer Clicker 🍺")
+    ])
+    await dp.start_polling(bot)
+
+# 🚀 Flask в отдельном потоке
+def run_flask():
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
-    async def main():
-        await bot.set_my_commands([
-            BotCommand(command="start", description="Запуск"),
-            BotCommand(command="play", description="Играть в Beer Clicker 🍺")
-        ])
-        # Параллельно запускаем Flask и polling
-        loop = asyncio.get_event_loop()
-        loop.create_task(dp.start_polling(bot))
-
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port)
-
-    asyncio.run(main())
+    threading.Thread(target=run_flask).start()
+    asyncio.run(start_bot())
