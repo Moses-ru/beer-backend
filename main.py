@@ -6,7 +6,7 @@ from aiogram import Bot
 app = Flask(__name__)
 
 # Получаем токен из переменной окружения
-BOT_TOKEN = os.getenv("7574810395:AAH7-PqxhdvqBU9FbW8nkX1w1RLMQBdWf-4")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не установлена")
 
