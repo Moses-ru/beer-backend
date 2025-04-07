@@ -1,7 +1,9 @@
+
 import os
 import asyncio
 from flask import Flask, request, jsonify
 from aiogram import Bot
+from collections import defaultdict
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
@@ -9,6 +11,9 @@ if not BOT_TOKEN:
 
 bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
+
+# Хранилище очков
+scores = defaultdict(int)
 
 @app.route("/api/score", methods=["POST"])
 def receive_score():
@@ -22,6 +27,8 @@ def receive_score():
         return jsonify({"error": "Missing fields"}), 400
 
     try:
+        scores[user_id] = max(scores[user_id], score)
+
         asyncio.run(bot.set_game_score(
             user_id=int(user_id),
             score=int(score),
@@ -33,24 +40,12 @@ def receive_score():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/highscores", methods=["GET"])
-def get_highscores():
-    user_id = request.args.get("user_id")
-    chat_id = request.args.get("chat_id")
-    message_id = request.args.get("message_id")
-
-    if not all([user_id, chat_id, message_id]):
-        return jsonify({"error": "Missing query params"}), 400
-
-    try:
-        scores = asyncio.run(bot.get_game_high_scores(
-            user_id=int(user_id),
-            chat_id=int(chat_id),
-            message_id=int(message_id)
-        ))
-        return jsonify([s.model_dump() for s in scores]), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route("/api/leaderboard", methods=["GET"])
+def get_leaderboard():
+    top_players = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:10]
+    return jsonify([
+        {"user_id": uid, "score": sc} for uid, sc in top_players
+    ])
 
 @app.route("/")
 def home():
