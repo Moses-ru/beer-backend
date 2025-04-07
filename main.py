@@ -3,23 +3,13 @@ import asyncio
 from flask import Flask, request, jsonify
 from aiogram import Bot
 
-# Получение токена из переменной окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise ValueError("Переменная окружения BOT_TOKEN не установлена")
+    raise ValueError("BOT_TOKEN not set")
 
-# Инициализация Telegram-бота
 bot = Bot(token=BOT_TOKEN)
-
-# Flask-приложение
 app = Flask(__name__)
 
-# Проверка работоспособности
-@app.route("/")
-def home():
-    return "🏓 Bot is up and running!"
-
-# Приём очков от фронтенда
 @app.route("/api/score", methods=["POST"])
 def receive_score():
     data = request.json
@@ -43,7 +33,10 @@ def receive_score():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Запуск Flask
+@app.route("/")
+def home():
+    return "🏓 Bot is up and running!"
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
