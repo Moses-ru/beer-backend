@@ -1,32 +1,25 @@
 import os
 import asyncio
-import threading
 from flask import Flask, request, jsonify
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import BotCommand
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram import Bot
 
+# Получение токена из переменной окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не установлена")
 
+# Инициализация Telegram-бота
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
+
+# Flask-приложение
 app = Flask(__name__)
 
-# Команды
-@dp.message(lambda msg: msg.text == "/start")
-async def cmd_start(message: types.Message):
-    await message.answer("Привет! Нажми /play чтобы начать игру 🍻")
+# Проверка работоспособности
+@app.route("/")
+def home():
+    return "🏓 Bot is up and running!"
 
-@dp.message(lambda msg: msg.text == "/play")
-async def cmd_play(message: types.Message):
-    await bot.send_game(
-        chat_id=message.chat.id,
-        game_short_name="beer_clicker"
-    )
-
-# Flask: приём очков
+# Приём очков от фронтенда
 @app.route("/api/score", methods=["POST"])
 def receive_score():
     data = request.json
@@ -50,23 +43,7 @@ def receive_score():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/")
-def home():
-    return "🏓 Bot is up and running!"
-
-# 🔁 Асинхронный запуск aiogram polling
-async def start_bot():
-    await bot.set_my_commands([
-        BotCommand(command="start", description="Запуск"),
-        BotCommand(command="play", description="Играть в Beer Clicker 🍺")
-    ])
-    await dp.start_polling(bot)
-
-# 🚀 Flask в отдельном потоке
-def run_flask():
+# Запуск Flask
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-if __name__ == "__main__":
-    threading.Thread(target=run_flask).start()
-    asyncio.run(start_bot())
