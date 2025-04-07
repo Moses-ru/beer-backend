@@ -1,79 +1,60 @@
-import os
-import sqlite3
-import asyncio
 from flask import Flask, request, jsonify
-from aiogram import Bot
+from flask_cors import CORS
+import sqlite3
+import os
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN not set")
-
-bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
+CORS(app)
 
-DB_FILE = "database.db"
+DB_PATH = 'scores.db'
 
+# Создание базы и таблицы при первом запуске
 def init_db():
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS scores (
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
                 score INTEGER
             )
-        """)
+        ''')
         conn.commit()
 
-@app.route("/api/score", methods=["POST"])
-def receive_score():
-    data = request.json
-    user_id = data.get("user_id")
-    score = data.get("score")
-    username = data.get("username") or "Unknown"
-    chat_id = data.get("chat_id")
-    message_id = data.get("message_id")
+@app.route('/api/score', methods=['POST'])
+def save_score():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    username = data.get('username', '')
+    score = data.get('score', 0)
 
-    if not all([user_id, score, chat_id, message_id]):
-        return jsonify({"error": "Missing fields"}), 400
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT score FROM scores WHERE user_id = ?', (user_id,))
+        row = cursor.fetchone()
+        if row:
+            if score > row[0]:  # Обновляем только если счёт больше
+                cursor.execute('UPDATE scores SET score = ?, username = ? WHERE user_id = ?', (score, username, user_id))
+        else:
+            cursor.execute('INSERT INTO scores (user_id, username, score) VALUES (?, ?, ?)', (user_id, username, score))
+        conn.commit()
 
-    try:
-        # Обновим базу данных
-        with sqlite3.connect(DB_FILE) as conn:
-            c = conn.cursor()
-            c.execute("""
-                INSERT INTO scores (user_id, username, score) VALUES (?, ?, ?)
-                ON CONFLICT(user_id) DO UPDATE SET score=excluded.score
-                WHERE excluded.score > scores.score
-            """, (user_id, username, score))
-            conn.commit()
+    return jsonify({"status": "ok"})
 
-        # Отправим очки в Telegram
-        asyncio.run(bot.set_game_score(
-            user_id=int(user_id),
-            score=int(score),
-            chat_id=int(chat_id),
-            message_id=int(message_id),
-            force=True
-        ))
+@app.route('/api/leaderboard', methods=['GET'])
+def leaderboard():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT user_id, username, score FROM scores ORDER BY score DESC LIMIT 10')
+        rows = cursor.fetchall()
+        result = [{"user_id": uid, "username": username, "score": score} for uid, username, score in rows]
+    return jsonify(result)
 
-        return jsonify({"status": "ok"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route('/')
+def index():
+    return "\U0001F37A Beer Clicker backend is running!"
 
-@app.route("/api/leaderboard", methods=["GET"])
-def get_leaderboard():
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        c.execute("SELECT username, score FROM scores ORDER BY score DESC LIMIT 10")
-        leaderboard = [{"username": row[0], "score": row[1]} for row in c.fetchall()]
-    return jsonify(leaderboard)
-
-@app.route("/")
-def home():
-    return "🏓 Bot is up and running!"
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
