@@ -28,7 +28,6 @@ def receive_score():
         return jsonify({"error": "Missing fields"}), 400
 
     try:
-        # Асинхронно устанавливаем очки пользователю
         asyncio.run(bot.set_game_score(
             user_id=int(user_id),
             score=int(score),
