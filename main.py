@@ -33,6 +33,25 @@ def receive_score():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/highscores", methods=["GET"])
+def get_highscores():
+    user_id = request.args.get("user_id")
+    chat_id = request.args.get("chat_id")
+    message_id = request.args.get("message_id")
+
+    if not all([user_id, chat_id, message_id]):
+        return jsonify({"error": "Missing query params"}), 400
+
+    try:
+        scores = asyncio.run(bot.get_game_high_scores(
+            user_id=int(user_id),
+            chat_id=int(chat_id),
+            message_id=int(message_id)
+        ))
+        return jsonify([s.model_dump() for s in scores]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/")
 def home():
     return "🏓 Bot is up and running!"
