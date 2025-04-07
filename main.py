@@ -4,7 +4,7 @@ import os
 import asyncio
 
 app = Flask(__name__)
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("7574810395:AAH7-PqxhdvqBU9FbW8nkX1w1RLMQBdWf-4")
 bot = Bot(token=BOT_TOKEN)
 
 @app.route("/api/score", methods=["POST"])
