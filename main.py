@@ -1,21 +1,31 @@
 import os
 import asyncio
 from flask import Flask, request, jsonify
-from aiogram import Bot
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import BotCommand
+from aiogram.fsm.storage.memory import MemoryStorage
 
-app = Flask(__name__)
-
-# Получаем токен из переменной окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не установлена")
 
 bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher(storage=MemoryStorage())
+app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return "🏓 Bot is up and running!"
+# Команды
+@dp.message(lambda msg: msg.text == "/start")
+async def cmd_start(message: types.Message):
+    await message.answer("Привет! Нажми /play чтобы начать игру 🍻")
 
+@dp.message(lambda msg: msg.text == "/play")
+async def cmd_play(message: types.Message):
+    await bot.send_game(
+        chat_id=message.chat.id,
+        game_short_name="beer_clicker"
+    )
+
+# Flask: получение очков
 @app.route("/api/score", methods=["POST"])
 def receive_score():
     data = request.json
@@ -39,6 +49,22 @@ def receive_score():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/")
+def home():
+    return "🏓 Bot is up and running!"
+
+# Запуск
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    async def main():
+        await bot.set_my_commands([
+            BotCommand(command="start", description="Запуск"),
+            BotCommand(command="play", description="Играть в Beer Clicker 🍺")
+        ])
+        # Параллельно запускаем Flask и polling
+        loop = asyncio.get_event_loop()
+        loop.create_task(dp.start_polling(bot))
+
+        port = int(os.environ.get("PORT", 5000))
+        app.run(host="0.0.0.0", port=port)
+
+    asyncio.run(main())
