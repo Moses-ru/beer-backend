@@ -1,9 +1,12 @@
 
 import os
+import json
 import asyncio
 from flask import Flask, request, jsonify
 from aiogram import Bot
 from collections import defaultdict
+
+SCORES_FILE = "scores.json"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
@@ -12,8 +15,17 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 
-# Хранилище очков
-scores = defaultdict(int)
+# Загрузка сохранённых очков
+if os.path.exists(SCORES_FILE):
+    with open(SCORES_FILE, "r") as f:
+        raw_scores = json.load(f)
+        scores = defaultdict(int, {int(k): int(v) for k, v in raw_scores.items()})
+else:
+    scores = defaultdict(int)
+
+def save_scores():
+    with open(SCORES_FILE, "w") as f:
+        json.dump(scores, f)
 
 @app.route("/api/score", methods=["POST"])
 def receive_score():
@@ -28,6 +40,7 @@ def receive_score():
 
     try:
         scores[user_id] = max(scores[user_id], score)
+        save_scores()  # сохраняем при обновлении
 
         asyncio.run(bot.set_game_score(
             user_id=int(user_id),
@@ -41,16 +54,3 @@ def receive_score():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/leaderboard", methods=["GET"])
-def get_leaderboard():
-    top_players = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:10]
-    return jsonify([
-        {"user_id": uid, "score": sc} for uid, sc in top_players
-    ])
-
-@app.route("/")
-def home():
-    return "🏓 Bot is up and running!"
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
