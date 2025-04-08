@@ -2,14 +2,20 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import psycopg2
 import os
+import hashlib
+import hmac
+import urllib.parse
 
 app = Flask(__name__)
 CORS(app)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")  # PostgreSQL URL from Render
+BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Telegram Bot Token
+
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
+
 
 def init_db():
     with get_connection() as conn:
@@ -23,8 +29,28 @@ def init_db():
             ''')
             conn.commit()
 
+
+def check_init_data(init_data_raw):
+    try:
+        parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
+        hash_from_telegram = parsed_data.pop("hash")
+
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed_data.items()))
+        secret_key = hmac.new("WebAppData".encode(), BOT_TOKEN.encode(), hashlib.sha256).digest()
+        calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+        return hmac.compare_digest(calculated_hash, hash_from_telegram)
+    except Exception as e:
+        print("Error validating initData:", e)
+        return False
+
+
 @app.route('/api/score', methods=['POST'])
 def save_score():
+    init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
+    if not init_data_raw or not check_init_data(init_data_raw):
+        return jsonify({"error": "Invalid init data"}), 403
+
     data = request.get_json()
     user_id = data.get('user_id')
     username = data.get('username', '')
@@ -45,6 +71,7 @@ def save_score():
 
     return jsonify({"status": "ok"})
 
+
 @app.route('/api/leaderboard', methods=['GET'])
 def leaderboard():
     with get_connection() as conn:
@@ -54,9 +81,11 @@ def leaderboard():
             result = [{"user_id": uid, "username": username, "score": score} for uid, username, score in rows]
     return jsonify(result)
 
+
 @app.route('/')
 def index():
     return "\U0001F37A Beer Clicker backend with PostgreSQL is running!"
+
 
 if __name__ == '__main__':
     init_db()
