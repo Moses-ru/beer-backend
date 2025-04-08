@@ -3,3 +3,4 @@ aiogram==3.19.0
 python-dotenv
 flask-cors
 aiosqlite
+psycopg2-binary
