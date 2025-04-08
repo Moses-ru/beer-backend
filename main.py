@@ -11,11 +11,10 @@ CORS(app)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")  # PostgreSQL URL from Render
 BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Telegram Bot Token
-
+WEBAPP_SECRET = os.environ.get("WEBAPP_SECRET")  # Correct secret for initData verification
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
-
 
 def init_db():
     with get_connection() as conn:
@@ -31,13 +30,12 @@ def init_db():
 
 def check_init_data(init_data_raw):
     try:
-        print("BOT_TOKEN:", BOT_TOKEN)
+        print("WEBAPP_SECRET:", WEBAPP_SECRET)
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
         hash_from_telegram = parsed_data.pop("hash")
 
-        # Telegram требует сортировки ключей по алфавиту
         data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed_data.items()))
-        secret_key = hmac.new(BOT_TOKEN.encode(), b"WebAppData", hashlib.sha256).digest()
+        secret_key = hmac.new(WEBAPP_SECRET.encode(), b"WebAppData", hashlib.sha256).digest()
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
         print("Telegram hash:", hash_from_telegram)
@@ -49,16 +47,14 @@ def check_init_data(init_data_raw):
         print("Error validating initData:", e)
         return False
 
-
 @app.route('/api/score', methods=['POST'])
 def save_score():
     init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
-    print("🔹 Получен X-Telegram-Bot-InitData:", init_data_raw)
+    print("\ud83d\udd39 Получен X-Telegram-Bot-InitData:", init_data_raw)
 
     if not init_data_raw or not check_init_data(init_data_raw):
-        print("❌ initData не прошёл валидацию")
+        print("\u274c initData не прошёл валидацию")
         return jsonify({"error": "Invalid init data"}), 403
-
 
     data = request.get_json()
     user_id = data.get('user_id')
@@ -80,7 +76,6 @@ def save_score():
 
     return jsonify({"status": "ok"})
 
-
 @app.route('/api/leaderboard', methods=['GET'])
 def leaderboard():
     with get_connection() as conn:
@@ -90,11 +85,9 @@ def leaderboard():
             result = [{"user_id": uid, "username": username, "score": score} for uid, username, score in rows]
     return jsonify(result)
 
-
 @app.route('/')
 def index():
     return "\U0001F37A Beer Clicker backend with PostgreSQL is running!"
-
 
 if __name__ == '__main__':
     init_db()
