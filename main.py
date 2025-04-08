@@ -53,8 +53,12 @@ def check_init_data(init_data_raw):
 @app.route('/api/score', methods=['POST'])
 def save_score():
     init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
+    print("🔹 Получен X-Telegram-Bot-InitData:", init_data_raw)
+
     if not init_data_raw or not check_init_data(init_data_raw):
+        print("❌ initData не прошёл валидацию")
         return jsonify({"error": "Invalid init data"}), 403
+
 
     data = request.get_json()
     user_id = data.get('user_id')
