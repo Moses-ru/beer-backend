@@ -5,14 +5,23 @@ import os
 import hashlib
 import hmac
 import urllib.parse
-import traceback  # для вывода стека ошибок
+import traceback
 
 app = Flask(__name__)
 CORS(app, origins=["https://moses-ru.github.io"])
 
+# Настройки
 DATABASE_URL = os.environ.get("DATABASE_URL")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 WEBAPP_SECRET = os.environ.get("WEBAPP_SECRET")
+
+# Генерация секрета, если не задан
+if not WEBAPP_SECRET and BOT_TOKEN:
+    WEBAPP_SECRET = hashlib.sha256(BOT_TOKEN.encode()).digest()
+elif WEBAPP_SECRET:
+    WEBAPP_SECRET = bytes.fromhex(WEBAPP_SECRET)
+else:
+    raise Exception("WEBAPP_SECRET или BOT_TOKEN не задан в переменных окружения")
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
@@ -30,17 +39,18 @@ def init_db():
                 ''')
                 conn.commit()
         print("✅ Таблица создана (или уже существует)")
-    except Exception as e:
+    except Exception:
         print("🔥 Ошибка при инициализации БД:")
         traceback.print_exc()
 
 def check_init_data(init_data_raw):
     try:
+        print("📩 X-Telegram-Bot-InitData (сырой):", init_data_raw)
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
         hash_from_telegram = parsed_data.pop("hash")
 
         data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed_data.items()))
-        secret_key = hmac.new(WEBAPP_SECRET.encode(), b"WebAppData", hashlib.sha256).digest()
+        secret_key = hmac.new(WEBAPP_SECRET, b"WebAppData", hashlib.sha256).digest()
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
         print("🔐 Проверка подписи:")
@@ -49,7 +59,7 @@ def check_init_data(init_data_raw):
         print(" - Строка проверки:", data_check_string)
 
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
-    except Exception as e:
+    except Exception:
         print("🔥 Ошибка при валидации initData:")
         traceback.print_exc()
         return False
@@ -71,8 +81,6 @@ def save_score():
         username = data.get('username', '')
         score = data.get('score', 0)
 
-        print(f"👤 user_id={user_id}, username={username}, score={score}")
-
         if not user_id:
             raise ValueError("user_id отсутствует в теле запроса")
 
@@ -93,10 +101,10 @@ def save_score():
 
         return jsonify({"status": "ok"})
 
-    except Exception as e:
+    except Exception:
         print("🔥 Ошибка в save_score:")
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 @app.route('/api/leaderboard', methods=['GET'])
 def leaderboard():
@@ -107,10 +115,10 @@ def leaderboard():
                 rows = cur.fetchall()
                 result = [{"user_id": uid, "username": username, "score": score} for uid, username, score in rows]
         return jsonify(result)
-    except Exception as e:
+    except Exception:
         print("🔥 Ошибка в leaderboard:")
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 @app.route('/')
 def index():
