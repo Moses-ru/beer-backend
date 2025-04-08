@@ -7,7 +7,7 @@ import hmac
 import urllib.parse
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://moses-ru.github.io"])
 
 DATABASE_URL = os.environ.get("DATABASE_URL")  # PostgreSQL URL from Render
 BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Telegram Bot Token
