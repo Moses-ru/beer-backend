@@ -31,6 +31,7 @@ def init_db():
 
 def check_init_data(init_data_raw):
     try:
+        print("BOT_TOKEN:", BOT_TOKEN)
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
         hash_from_telegram = parsed_data.pop("hash")
 
