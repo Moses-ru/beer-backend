@@ -29,7 +29,7 @@ def init_db():
             ''')
             conn.commit()
 
-
+print("🔹 Получен X-Telegram-Bot-InitData:", init_data_raw)
 def check_init_data(init_data_raw):
     try:
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
