@@ -35,9 +35,14 @@ def check_init_data(init_data_raw):
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
         hash_from_telegram = parsed_data.pop("hash")
 
+        # Telegram требует сортировки ключей по алфавиту
         data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed_data.items()))
-        secret_key = hmac.new("WebAppData".encode(), BOT_TOKEN.encode(), hashlib.sha256).digest()
+        secret_key = hmac.new(BOT_TOKEN.encode(), b"WebAppData", hashlib.sha256).digest()
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+        print("Telegram hash:", hash_from_telegram)
+        print("Calculated hash:", calculated_hash)
+        print("Data string:", data_check_string)
 
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
     except Exception as e:
