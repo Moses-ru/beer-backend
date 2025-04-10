@@ -69,33 +69,49 @@ def mark_request_as_processed(init_data_hash):
 
 def check_init_data(init_data_raw):
     try:
-        # Парсим данные
+        if not init_data_raw:
+            print("⚠️ Empty init_data_raw")
+            return False
+            
+        # Декодируем URL-encoded строку
+        init_data_raw = urllib.parse.unquote(init_data_raw)
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw))
-        hash_from_telegram = parsed_data.pop("hash")
         
-        # Удаляем поле signature, если оно есть
+        if not parsed_data:
+            print("⚠️ Failed to parse init_data")
+            return False
+
+        hash_from_telegram = parsed_data.get("hash")
+        if not hash_from_telegram:
+            print("⚠️ No hash in init_data")
+            return False
+
+        # Удаляем ненужные поля
         parsed_data.pop("signature", None)
-        
-        # Формируем строку для проверки (ключи должны быть отсортированы)
+        parsed_data.pop("hash", None)
+
+        # Формируем data_check_string (ключи должны быть отсортированы)
         data_check_string = "\n".join(
             f"{k}={v}" for k, v in sorted(parsed_data.items()))
         
-        # Создаем секретный ключ из токена бота
+        print("🔍 Data check string:", data_check_string)
+
+        # Создаем секретный ключ
         secret_key = hmac.new(
             key=b"WebAppData",
             msg=BOT_TOKEN.encode(),
             digestmod=hashlib.sha256
         ).digest()
-        
+
         # Вычисляем хеш
         calculated_hash = hmac.new(
             key=secret_key,
             msg=data_check_string.encode(),
             digestmod=hashlib.sha256
         ).hexdigest()
-        
-        print(f"🔍 Calculated hash: {calculated_hash}")
-        print(f"🔍 Telegram hash: {hash_from_telegram}")
+
+        print(f"🔍 Calculated: {calculated_hash}")
+        print(f"🔍 From Telegram: {hash_from_telegram}")
         
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
     except Exception as e:
