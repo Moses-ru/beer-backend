@@ -330,15 +330,6 @@ def handle_achievements():
 
         return jsonify({"status": "ok"})
 
-@app.route('/debug_auth', methods=['POST'])
-def debug_auth():
-    return jsonify({
-        "headers": dict(request.headers),
-        "init_data": request.headers.get('X-Telegram-Bot-InitData'),
-        "server_time": int(time.time()),
-        "bot_token": BOT_TOKEN[:5] + "..." + BOT_TOKEN[-5:]
-    })
-
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
