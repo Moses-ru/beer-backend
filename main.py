@@ -25,6 +25,51 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     raise Exception("❌ BOT_TOKEN не задан")
 
+def validate_init_data(init_data_str):
+    try:
+        if not init_data_str:
+            return False
+            
+        # Парсим данные
+        init_data = dict(urllib.parse.parse_qsl(init_data_str))
+        if 'hash' not in init_data:
+            return False
+            
+        # Извлекаем hash и удаляем его из данных
+        hash_from_telegram = init_data.pop('hash')
+        
+        # Формируем строку для проверки в правильном порядке
+        data_check_string = "\n".join([
+            f"auth_date={init_data['auth_date']}",
+            f"query_id={init_data['query_id']}",
+            f"user={init_data['user']}"
+        ])
+        
+        # Проверяем время (допустимое расхождение 5 минут)
+        auth_time = int(init_data['auth_date'])
+        current_time = int(time.time())
+        if abs(current_time - auth_time) > 300:
+            return False
+            
+        # Генерируем секретный ключ
+        secret_key = hmac.new(
+            key=b"WebAppData",
+            msg=BOT_TOKEN.encode(),
+            digestmod=hashlib.sha256
+        ).digest()
+        
+        # Вычисляем хеш
+        calculated_hash = hmac.new(
+            key=secret_key,
+            msg=data_check_string.encode(),
+            digestmod=hashlib.sha256
+        ).hexdigest()
+        
+        return hmac.compare_digest(calculated_hash, hash_from_telegram)
+    except Exception as e:
+        print(f"Validation error: {e}")
+        return False
+
 # Преобразуем токен бота в ключ для проверки
 WEBAPP_SECRET = hmac.new(
     key=b"WebAppData",
@@ -211,7 +256,11 @@ def index():
     return "🍺 Beer Clicker backend is running!"
 
 @app.route('/api/achievements/<int:user_id>', methods=['GET'])
-def get_achievements(user_id):
+def get_achievements():
+    init_data = request.headers.get('X-Telegram-Bot-InitData')
+    
+    if not validate_init_data(init_data):
+        return jsonify({"error": "Invalid authentication"}), 403
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -224,6 +273,7 @@ def get_achievements(user_id):
         print("🔥 Ошибка в get_achievements:")
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
+    return jsonify({"status": "success"})
 
 @app.route('/api/achievements', methods=['GET', 'POST', 'OPTIONS'])
 def handle_achievements():
@@ -285,6 +335,15 @@ def after_request(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Bot-InitData"
     return response
+
+@app.route('/debug_auth', methods=['POST'])
+def debug_auth():
+    return jsonify({
+        "headers": dict(request.headers),
+        "init_data": request.headers.get('X-Telegram-Bot-InitData'),
+        "server_time": int(time.time()),
+        "bot_token": BOT_TOKEN[:5] + "..." + BOT_TOKEN[-5:]
+    })
 
 if __name__ == '__main__':
     init_db()
