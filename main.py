@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import psycopg2
+import psycopg2.extras
 import os
 import hashlib
 import hmac
@@ -9,6 +10,8 @@ import traceback
 
 app = Flask(__name__)
 CORS(app, origins=["https://moses-ru.github.io"])
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 WEBAPP_SECRET = os.environ.get("WEBAPP_SECRET")
@@ -125,6 +128,46 @@ def get_achievements(user_id):
         print("🔥 Ошибка в get_achievements:")
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
+
+@app.route('/api/achievements', methods=['GET', 'POST', 'OPTIONS'])
+def handle_achievements():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
+    if not init_data_raw or not check_init_data(init_data_raw):
+        return jsonify({"error": "Invalid init data"}), 403
+
+    if request.method == 'GET':
+        parsed_data = dict(urllib.parse.parse_qsl(init_data_raw))
+        user_id = parsed_data.get("user")
+        if not user_id:
+            return jsonify({"error": "Missing user ID"}), 400
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT data FROM achievements WHERE user_id = %s", (user_id,))
+                row = cur.fetchone()
+                return jsonify(row[0] if row else {})
+
+    if request.method == 'POST':
+        data = request.get_json()
+        user_id = data.get("user_id")
+        achievements = data.get("achievements")
+
+        if not user_id or not isinstance(achievements, dict):
+            return jsonify({"error": "Missing or invalid data"}), 400
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO achievements (user_id, data)
+                    VALUES (%s, %s)
+                    ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data
+                """, (user_id, psycopg2.extras.Json(achievements)))
+                conn.commit()
+        return jsonify({"status": "ok"})
+
 
 if __name__ == '__main__':
     init_db()
