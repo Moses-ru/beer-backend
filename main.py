@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from auth import verify_telegram_auth
 import psycopg2
 import psycopg2.extras
 import os
@@ -93,7 +94,25 @@ def after_request(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Bot-InitData"
     return response
+    
+@app.route('/debug_auth', methods=['GET'])
+def debug_auth():
+    init_data = request.args.get('initData') or request.headers.get('X-Telegram-InitData')
+    
+    if not init_data:
+        return jsonify({"error": "Missing initData"}), 400
 
+    try:
+        auth_data = verify_telegram_auth(init_data)
+        return jsonify({
+            "status": "ok",
+            "auth_data": auth_data
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 403
 
 @app.route('/api/verify', methods=['POST'])
 def verify_init_data():
