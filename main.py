@@ -250,8 +250,8 @@ def leaderboard():
 def index():
     return "🍺 Beer Clicker backend is running!"
 
-@app.route('/api/achievements/<int:user_id>', methods=['GET'])
-def get_achievements():
+@app.route("/api/achievements/<int:user_id>", methods=["GET"])
+def get_achievements(user_id):
     init_data = request.headers.get('X-Telegram-Bot-InitData')
     
     if not validate_init_data(init_data):
