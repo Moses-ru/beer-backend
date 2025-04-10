@@ -9,6 +9,8 @@ import hashlib
 import hmac
 import urllib.parse
 import traceback
+import time
+import json
 
 def get_correct_time():
     tz = pytz.timezone('Asia/Yekaterinburg')
@@ -87,9 +89,9 @@ def server_time():
 
 @app.after_request
 def after_request(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = "https://moses-ru.github.io"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Bot-InitData"
     return response
 
 
@@ -135,13 +137,6 @@ def is_init_data_processed(init_data_hash):
         with conn.cursor() as cur:
             cur.execute("SELECT 1 FROM processed_requests WHERE request_hash = %s", (init_data_hash,))
             return cur.fetchone() is not None
-
-def mark_request_as_processed(init_data_hash):
-    """Помечаем запрос как обработанный"""
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("INSERT INTO processed_requests (request_hash) VALUES (%s)", (init_data_hash,))
-            conn.commit()
 
 def check_init_data(init_data_raw):
     try:
@@ -212,7 +207,7 @@ def save_score():
 
         data = request.get_json()
         user_id = data.get('user_id')
-        username = data.get('username', '')
+        username = data.get('username') or data.get('first_name') or f"user_{user_id}"
         score = data.get('score', 0)
 
         if not user_id:
@@ -315,13 +310,6 @@ def handle_achievements():
         mark_request_as_processed(init_data_hash)
 
         return jsonify({"status": "ok"})
-
-@app.after_request
-def after_request(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://moses-ru.github.io"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Bot-InitData"
-    return response
 
 @app.route('/debug_auth', methods=['POST'])
 def debug_auth():
