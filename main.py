@@ -105,6 +105,21 @@ def leaderboard():
 def index():
     return "🍺 Beer Clicker backend is running!"
 
+@app.route('/api/achievements/<int:user_id>', methods=['GET'])
+def get_achievements(user_id):
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT data FROM achievements WHERE user_id = %s", (user_id,))
+                row = cur.fetchone()
+                if row:
+                    return jsonify(row[0])
+        return jsonify({})
+    except Exception:
+        print("🔥 Ошибка в get_achievements:")
+        traceback.print_exc()
+        return jsonify({"error": "Server error"}), 500
+
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
