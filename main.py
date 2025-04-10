@@ -12,12 +12,13 @@ app = Flask(__name__)
 CORS(app)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-WEBAPP_SECRET = os.environ.get("WEBAPP_SECRET")
 
-if not WEBAPP_SECRET:
-    raise Exception("❌ WEBAPP_SECRET не задан в переменных окружения")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Токен бота (например, "123456:ABC-DEF1234...")
+if not BOT_TOKEN:
+    raise Exception("❌ BOT_TOKEN не задан")
 
-WEBAPP_SECRET = bytes.fromhex(WEBAPP_SECRET)
+# Ключ для проверки initData — это HMAC-SHA256 от "WebAppData" + BOT_TOKEN
+WEBAPP_SECRET = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
