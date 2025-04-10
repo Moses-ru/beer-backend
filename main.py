@@ -27,6 +27,23 @@ WEBAPP_SECRET = hmac.new(
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
+@app.after_request
+def after_request(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
+
+@app.route('/api/verify', methods=['POST'])
+def verify_init_data():
+    init_data = request.headers.get("X-Telegram-Bot-InitData", "")
+    return jsonify({
+        "status": "ok",
+        "is_valid": check_init_data(init_data),
+        "init_data_length": len(init_data),
+        "bot_token_prefix": BOT_TOKEN[:5] + "..." + BOT_TOKEN[-5:]
+    })
+
 def init_db():
     try:
         with get_connection() as conn:
@@ -72,31 +89,31 @@ def check_init_data(init_data_raw):
         if not init_data_raw:
             print("⚠️ Empty init_data_raw")
             return False
-            
-        # Декодируем URL-encoded строку
-        init_data_raw = urllib.parse.unquote(init_data_raw)
-        parsed_data = dict(urllib.parse.parse_qsl(init_data_raw))
-        
-        if not parsed_data:
-            print("⚠️ Failed to parse init_data")
-            return False
 
-        hash_from_telegram = parsed_data.get("hash")
+        # Декодируем URL-encoded строку только один раз
+        init_data_raw = urllib.parse.unquote(init_data_raw)
+        parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, keep_blank_values=True))
+        
+        hash_from_telegram = parsed_data.pop("hash", "")
         if not hash_from_telegram:
             print("⚠️ No hash in init_data")
             return False
 
         # Удаляем ненужные поля
         parsed_data.pop("signature", None)
-        parsed_data.pop("hash", None)
 
-        # Формируем data_check_string (ключи должны быть отсортированы)
-        data_check_string = "\n".join(
-            f"{k}={v}" for k, v in sorted(parsed_data.items()))
+        # Формируем data_check_string в точном порядке
+        required_fields = ['auth_date', 'query_id', 'user']
+        data_check_string_parts = []
         
+        for field in required_fields:
+            if field in parsed_data:
+                data_check_string_parts.append(f"{field}={parsed_data[field]}")
+        
+        data_check_string = "\n".join(data_check_string_parts)
         print("🔍 Data check string:", data_check_string)
 
-        # Создаем секретный ключ
+        # Генерируем секретный ключ
         secret_key = hmac.new(
             key=b"WebAppData",
             msg=BOT_TOKEN.encode(),
@@ -111,7 +128,7 @@ def check_init_data(init_data_raw):
         ).hexdigest()
 
         print(f"🔍 Calculated: {calculated_hash}")
-        print(f"🔍 From Telegram: {hash_from_telegram}")
+        print(f"🔍 Telegram: {hash_from_telegram}")
         
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
     except Exception as e:
