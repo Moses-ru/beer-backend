@@ -9,7 +9,7 @@ import urllib.parse
 import traceback
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 WEBAPP_SECRET = os.environ.get("WEBAPP_SECRET")
