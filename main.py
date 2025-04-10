@@ -27,7 +27,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     raise Exception("❌ BOT_TOKEN не задан")
 
-def validate_init_data(init_data_str):
+def check_init_data(init_data_str):
     try:
         if not init_data_str:
             return False
@@ -254,7 +254,7 @@ def index():
 def get_achievements(user_id):
     init_data = request.headers.get('X-Telegram-Bot-InitData')
     
-    if not validate_init_data(init_data):
+    if not check_init_data(init_data):
         return jsonify({"error": "Invalid authentication"}), 403
     try:
         with get_connection() as conn:
@@ -278,7 +278,7 @@ def handle_achievements():
     init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
     
     # Проверка аутентификации
-    if not init_data_raw or not validate_init_data(init_data_raw):
+    if not init_data_raw or not check_init_data(init_data_raw):
         return jsonify({"error": "Invalid init data"}), 403
     
     try:
