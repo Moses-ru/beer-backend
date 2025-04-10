@@ -9,8 +9,7 @@ import urllib.parse
 import traceback
 
 app = Flask(__name__)
-CORS(app, origins=["https://moses-ru.github.io"])
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": "https://moses-ru.github.io"}})
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 WEBAPP_SECRET = os.environ.get("WEBAPP_SECRET")
@@ -85,7 +84,7 @@ def check_init_data(init_data_raw):
 
 init_db()
 
-@app.route('/api/score', methods=['POST'])
+@app.route('/api/score', methods=['OPTIONS', 'POST'])
 def save_score():
     try:
         init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
@@ -119,7 +118,7 @@ def save_score():
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
 
-@app.route('/api/leaderboard', methods=['GET'])
+@app.route('/api/leaderboard', methods=['OPTIONS', 'POST', 'GET'])
 def leaderboard():
     try:
         with get_connection() as conn:
@@ -205,6 +204,13 @@ def handle_achievements():
         mark_request_as_processed(init_data_hash)
 
         return jsonify({"status": "ok"})
+
+@app.after_request
+def after_request(response):
+    response.headers["Access-Control-Allow-Origin"] = "https://moses-ru.github.io"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Bot-InitData"
+    return response
 
 if __name__ == '__main__':
     init_db()
