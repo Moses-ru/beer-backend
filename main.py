@@ -14,10 +14,7 @@ def get_correct_time():
     tz = pytz.timezone('Asia/Yekaterinburg')
     return datetime.now(tz)
 
-# Эндпоинт для проверки времени
-@app.route('/server_time')
-def server_time():
-    return f"Екатеринбург: {get_correct_time()}"
+
 
 app = Flask(__name__)
 CORS(app)
@@ -37,6 +34,11 @@ WEBAPP_SECRET = hmac.new(
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
+
+# Эндпоинт для проверки времени
+@app.route('/server_time')
+def server_time():
+    return f"Екатеринбург: {get_correct_time()}"
 
 @app.after_request
 def after_request(response):
