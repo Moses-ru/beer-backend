@@ -275,54 +275,41 @@ def get_achievements():
         return jsonify({"error": "Server error"}), 500
     return jsonify({"status": "success"})
 
-@app.route('/api/achievements', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/api/achievements', methods=['GET', 'OPTIONS'])
 def handle_achievements():
     if request.method == 'OPTIONS':
         return '', 204
-
+    
     init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
     
-    print("📦 Получен initData:")
-    print(init_data_raw)
-    
-    if not init_data_raw or not check_init_data(init_data_raw):
+    # Проверка аутентификации
+    if not init_data_raw or not validate_init_data(init_data_raw):
         return jsonify({"error": "Invalid init data"}), 403
-
-    # Получаем хеш запроса
-    init_data_hash = get_init_data_hash(init_data_raw)
     
-    # Проверяем, был ли уже обработан этот запрос
-    if is_init_data_processed(init_data_hash):
-        return jsonify({"error": "Request already processed"}), 400
-
-    # Получаем данные из запроса
-    if request.method == 'GET':
+    try:
+        # Парсим user_id из initData
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw))
-        user_id = parsed_data.get("user")
-        if not user_id:
-            return jsonify({"error": "Missing user ID"}), 400
-
+        user = parsed_data.get('user')
+        if not user:
+            return jsonify({"error": "Missing user data"}), 400
+            
+        # Парсим JSON user
+        try:
+            user_data = json.loads(user)
+            user_id = user_data.get('id')
+        except json.JSONDecodeError:
+            return jsonify({"error": "Invalid user data format"}), 400
+        
+        # Получаем achievements из БД
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT data FROM achievements WHERE user_id = %s", (user_id,))
                 row = cur.fetchone()
                 return jsonify(row[0] if row else {})
-
-    if request.method == 'POST':
-        data = request.get_json()
-        user_id = data.get("user_id")
-        achievements = data.get("achievements")
-
-        if not user_id or not isinstance(achievements, dict):
-            return jsonify({"error": "Missing or invalid data"}), 400
-
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""INSERT INTO achievements (user_id, data)
-                               VALUES (%s, %s)
-                               ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data""",
-                            (user_id, psycopg2.extras.Json(achievements)))
-                conn.commit()
+                
+    except Exception as e:
+        print(f"Error in achievements handler: {e}")
+        return jsonify({"error": "Server error"}), 500
 
         # После обработки запроса помечаем его как обработанный
         mark_request_as_processed(init_data_hash)
