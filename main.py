@@ -95,7 +95,7 @@ def after_request(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Bot-InitData"
     return response
     
-@app.route('/debug_auth', methods=['GET'])
+@app.route('/debug_auth', methods=['GET', 'POST'])
 def debug_auth():
     init_data = request.args.get('initData') or request.headers.get('X-Telegram-InitData')
     
