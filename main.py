@@ -78,7 +78,7 @@ def check_init_data(init_data_raw):
         
         # Формируем строку для проверки (ключи должны быть отсортированы)
         data_check_string = "\n".join(
-            f"{k}={v}" for k, v in sorted(parsed_data.items())
+            f"{k}={v}" for k, v in sorted(parsed_data.items()))
         
         # Создаем секретный ключ из токена бота
         secret_key = hmac.new(
