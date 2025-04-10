@@ -3,10 +3,21 @@ from flask_cors import CORS
 import psycopg2
 import psycopg2.extras
 import os
+from datetime import datetime, timedelta
+import pytz
 import hashlib
 import hmac
 import urllib.parse
 import traceback
+
+def get_correct_time():
+    tz = pytz.timezone('Asia/Yekaterinburg')
+    return datetime.now(tz)
+
+# Эндпоинт для проверки времени
+@app.route('/server_time')
+def server_time():
+    return f"Екатеринбург: {get_correct_time()}"
 
 app = Flask(__name__)
 CORS(app)
@@ -95,48 +106,55 @@ def check_init_data(init_data_raw):
             print("⚠️ Empty init_data_raw")
             return False
 
-        # Декодируем URL-encoded строку
+        # 1. Декодируем URL-encoded строку (только один раз!)
         init_data_raw = urllib.parse.unquote(init_data_raw)
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, keep_blank_values=True))
         
-        hash_from_telegram = parsed_data.pop("hash", "")
-        if not hash_from_telegram:
-            print("⚠️ No hash in init_data")
+        # 2. Проверка обязательных полей
+        required_fields = {'auth_date', 'query_id', 'user', 'hash'}
+        if not required_fields.issubset(parsed_data.keys()):
+            print(f"⚠️ Missing fields in init_data: {parsed_data.keys()}")
             return False
 
-        # Удаляем поле signature
-        parsed_data.pop("signature", None)
+        hash_from_telegram = parsed_data.pop("hash")
+        
+        # 3. Проверка времени (добавляем точную проверку часового пояса)
+        auth_time = datetime.fromtimestamp(int(parsed_data['auth_date']), pytz.utc)
+        server_time = datetime.now(pytz.timezone('Asia/Yekaterinburg'))
+        
+        if (server_time - auth_time) > timedelta(minutes=5):
+            print(f"⚠️ Time mismatch: Server={server_time} (UTC+5) vs Auth={auth_time} (UTC)")
+            return False
 
-        # Формируем data_check_string в ТОЧНОМ порядке полей:
-        # auth_date, query_id, user
+        # 4. Формируем data_check_string в строгом порядке
         data_check_string = "\n".join([
             f"auth_date={parsed_data['auth_date']}",
             f"query_id={parsed_data['query_id']}",
             f"user={parsed_data['user']}"
         ])
 
-        print("🔍 Data check string:", data_check_string)
+        # 5. Генерация ключа с улучшенной обработкой ошибок
+        try:
+            secret_key = hmac.new(
+                key=b"WebAppData",
+                msg=BOT_TOKEN.encode(),
+                digestmod=hashlib.sha256
+            ).digest()
+            
+            calculated_hash = hmac.new(
+                key=secret_key,
+                msg=data_check_string.encode(),
+                digestmod=hashlib.sha256
+            ).hexdigest()
+        except Exception as hmac_error:
+            print(f"🔥 HMAC generation error: {hmac_error}")
+            return False
 
-        # Генерируем секретный ключ
-        secret_key = hmac.new(
-            key=b"WebAppData",
-            msg=BOT_TOKEN.encode(),
-            digestmod=hashlib.sha256
-        ).digest()
-
-        # Вычисляем хеш
-        calculated_hash = hmac.new(
-            key=secret_key,
-            msg=data_check_string.encode(),
-            digestmod=hashlib.sha256
-        ).hexdigest()
-
-        print(f"🔍 Calculated: {calculated_hash}")
-        print(f"🔍 Telegram: {hash_from_telegram}")
-        
+        # 6. Безопасное сравнение хешей
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
+        
     except Exception as e:
-        print(f"🔥 Error in check_init_data: {str(e)}")
+        print(f"🔥 Critical error in check_init_data: {str(e)}")
         traceback.print_exc()
         return False
         
