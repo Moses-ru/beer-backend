@@ -26,14 +26,20 @@ def init_db():
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute('''
+                    CREATE TABLE IF NOT EXISTS achievements (
+                        user_id BIGINT PRIMARY KEY,
+                        data JSONB
+                    );
+                ''')
+                cur.execute('''
                     CREATE TABLE IF NOT EXISTS scores (
                         user_id BIGINT PRIMARY KEY,
                         username TEXT,
                         score INTEGER
-                    )
+                    );
                 ''')
                 conn.commit()
-        print("✅ Таблица инициализирована")
+        print("✅ Таблицы инициализированы")
     except Exception:
         print("🔥 Ошибка при инициализации БД:")
         traceback.print_exc()
