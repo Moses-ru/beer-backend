@@ -90,7 +90,7 @@ def check_init_data(init_data_raw):
             print("⚠️ Empty init_data_raw")
             return False
 
-        # Декодируем URL-encoded строку только один раз
+        # Декодируем URL-encoded строку
         init_data_raw = urllib.parse.unquote(init_data_raw)
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, keep_blank_values=True))
         
@@ -99,18 +99,17 @@ def check_init_data(init_data_raw):
             print("⚠️ No hash in init_data")
             return False
 
-        # Удаляем ненужные поля
+        # Удаляем поле signature
         parsed_data.pop("signature", None)
 
-        # Формируем data_check_string в точном порядке
-        required_fields = ['auth_date', 'query_id', 'user']
-        data_check_string_parts = []
-        
-        for field in required_fields:
-            if field in parsed_data:
-                data_check_string_parts.append(f"{field}={parsed_data[field]}")
-        
-        data_check_string = "\n".join(data_check_string_parts)
+        # Формируем data_check_string в ТОЧНОМ порядке полей:
+        # auth_date, query_id, user
+        data_check_string = "\n".join([
+            f"auth_date={parsed_data['auth_date']}",
+            f"query_id={parsed_data['query_id']}",
+            f"user={parsed_data['user']}"
+        ])
+
         print("🔍 Data check string:", data_check_string)
 
         # Генерируем секретный ключ
