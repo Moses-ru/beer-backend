@@ -64,21 +64,37 @@ def mark_request_as_processed(init_data_hash):
 
 def check_init_data(init_data_raw):
     try:
+        print("📦 Raw initData:", init_data_raw)  # Логируем исходные данные
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
-        hash_from_telegram = parsed_data.pop("hash")
+        print("📦 Parsed data:", parsed_data)  # Логируем распарсенные данные
 
-        # Убедитесь, что ключи отсортированы
-        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed_data.items()))
-        secret_key = hmac.new(WEBAPP_SECRET, b"WebAppData", hashlib.sha256).digest()
-        calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        hash_from_telegram = parsed_data.pop("hash", "")
+        if not hash_from_telegram:
+            print("🔥 Отсутствует hash в initData")
+            return False
+
+        # Удаляем поле signature, если оно есть
+        parsed_data.pop("signature", None)
+
+        # Формируем data_check_string
+        data_check_string = "\n".join(
+            f"{k}={v}" for k, v in sorted(parsed_data.items())
+        )
 
         print("🔍 data_check_string:", data_check_string)
+
+        # Генерируем секретный ключ
+        secret_key = hmac.new(WEBAPP_SECRET, b"WebAppData", hashlib.sha256).digest()
+        calculated_hash = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256
+        ).hexdigest()
+
         print("🔍 Calculated hash:", calculated_hash)
         print("🔍 Hash from Telegram:", hash_from_telegram)
 
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
-    except Exception:
-        print("🔥 Ошибка в check_init_data:")
+    except Exception as e:
+        print("🔥 Ошибка в check_init_data:", str(e))
         traceback.print_exc()
         return False
 
