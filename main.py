@@ -56,6 +56,10 @@ def check_init_data(init_data_raw):
         secret_key = hmac.new(WEBAPP_SECRET, b"WebAppData", hashlib.sha256).digest()
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
+        print("🔍 data_check_string:", data_check_string)
+        print("🔍 Calculated hash:", calculated_hash)
+        print("🔍 Hash from Telegram:", hash_from_telegram)
+
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
     except Exception:
         print("🔥 Ошибка в check_init_data:")
