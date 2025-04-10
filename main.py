@@ -78,7 +78,7 @@ def check_init_data(init_data_raw):
         
         # Сортируем ключи и формируем строку для проверки
         data_check_string = "\n".join(
-            f"{k}={v}" for k, v in sorted(parsed_data.items())
+            f"{k}={v}" for k, v in sorted(parsed_data.items()))
         
         # Секретный ключ - HMAC-SHA256 от "WebAppData" + токен бота
         secret_key = hmac.new(
