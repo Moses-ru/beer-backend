@@ -34,6 +34,11 @@ def after_request(response):
     response.headers["Access-Control-Allow-Headers"] = "*"
     return response
 
+@app.route('/server_time')
+def server_time():
+    import datetime
+    return str(datetime.datetime.now())
+
 @app.route('/api/verify', methods=['POST'])
 def verify_init_data():
     init_data = request.headers.get("X-Telegram-Bot-InitData", "")
