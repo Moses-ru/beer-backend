@@ -62,6 +62,8 @@ def check_init_data(init_data_raw):
         traceback.print_exc()
         return False
 
+init_db()
+
 @app.route('/api/score', methods=['POST'])
 def save_score():
     try:
