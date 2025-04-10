@@ -13,12 +13,16 @@ CORS(app)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Токен бота (например, "123456:ABC-DEF1234...")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     raise Exception("❌ BOT_TOKEN не задан")
 
-# Ключ для проверки initData — это HMAC-SHA256 от "WebAppData" + BOT_TOKEN
-WEBAPP_SECRET = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+# Преобразуем токен бота в ключ для проверки
+WEBAPP_SECRET = hmac.new(
+    key=b"WebAppData",
+    msg=BOT_TOKEN.encode(),
+    digestmod=hashlib.sha256
+).digest()
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
@@ -65,39 +69,34 @@ def mark_request_as_processed(init_data_hash):
 
 def check_init_data(init_data_raw):
     try:
-        print("📦 Raw initData:", init_data_raw)  # Логируем исходные данные
+        # Парсим данные
+        parsed_data = dict(urllib.parse.parse_qsl(init_data_raw))
+        hash_from_telegram = parsed_data.pop("hash")
         
-        parsed_data = dict(urllib.parse.parse_qsl(init_data_raw, strict_parsing=True))
-        print("📦 Parsed data:", parsed_data)  # Логируем распарсенные данные
-
-        hash_from_telegram = parsed_data.pop("hash", "")
-        if not hash_from_telegram:
-            print("🔥 Отсутствует hash в initData")
-            return False
-
-        # Удаляем поле signature, если оно есть
+        # Удаляем ненужные поля (signature не должен участвовать)
         parsed_data.pop("signature", None)
-
-        # Формируем data_check_string (ключи должны быть отсортированы!)
+        
+        # Сортируем ключи и формируем строку для проверки
         data_check_string = "\n".join(
             f"{k}={v}" for k, v in sorted(parsed_data.items())
-        )
-        print("🔍 data_check_string:", data_check_string)
-
-        # Генерируем секретный ключ на основе BOT_TOKEN
+        
+        # Секретный ключ - HMAC-SHA256 от "WebAppData" + токен бота
         secret_key = hmac.new(
-            WEBAPP_SECRET,  # Теперь это HMAC-SHA256 от "WebAppData" + BOT_TOKEN
-            data_check_string.encode(),
-            hashlib.sha256
+            WEBAPP_SECRET,  # Должен быть bytes
+            msg="WebAppData".encode(),
+            digestmod=hashlib.sha256
+        ).digest()
+        
+        # Вычисляем хеш
+        calculated_hash = hmac.new(
+            secret_key,
+            msg=data_check_string.encode(),
+            digestmod=hashlib.sha256
         ).hexdigest()
-
-        print("🔍 Calculated hash:", secret_key)
-        print("🔍 Hash from Telegram:", hash_from_telegram)
-
-        return hmac.compare_digest(secret_key, hash_from_telegram)
+        
+        return hmac.compare_digest(calculated_hash, hash_from_telegram)
     except Exception as e:
-        print("🔥 Ошибка в check_init_data:", str(e))
-        traceback.print_exc()
+        print(f"Error in check_init_data: {e}")
         return False
 
 init_db()
