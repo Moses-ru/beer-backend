@@ -73,32 +73,36 @@ def check_init_data(init_data_raw):
         parsed_data = dict(urllib.parse.parse_qsl(init_data_raw))
         hash_from_telegram = parsed_data.pop("hash")
         
-        # Удаляем ненужные поля (signature не должен участвовать)
+        # Удаляем поле signature, если оно есть
         parsed_data.pop("signature", None)
         
-        # Сортируем ключи и формируем строку для проверки
+        # Формируем строку для проверки (ключи должны быть отсортированы)
         data_check_string = "\n".join(
-            f"{k}={v}" for k, v in sorted(parsed_data.items()))
+            f"{k}={v}" for k, v in sorted(parsed_data.items())
         
-        # Секретный ключ - HMAC-SHA256 от "WebAppData" + токен бота
+        # Создаем секретный ключ из токена бота
         secret_key = hmac.new(
-            WEBAPP_SECRET,  # Должен быть bytes
-            msg="WebAppData".encode(),
+            key=b"WebAppData",
+            msg=BOT_TOKEN.encode(),
             digestmod=hashlib.sha256
         ).digest()
         
         # Вычисляем хеш
         calculated_hash = hmac.new(
-            secret_key,
+            key=secret_key,
             msg=data_check_string.encode(),
             digestmod=hashlib.sha256
         ).hexdigest()
         
+        print(f"🔍 Calculated hash: {calculated_hash}")
+        print(f"🔍 Telegram hash: {hash_from_telegram}")
+        
         return hmac.compare_digest(calculated_hash, hash_from_telegram)
     except Exception as e:
-        print(f"Error in check_init_data: {e}")
+        print(f"🔥 Error in check_init_data: {str(e)}")
+        traceback.print_exc()
         return False
-
+        
 init_db()
 
 @app.route('/api/score', methods=['OPTIONS', 'POST'])
