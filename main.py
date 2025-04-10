@@ -137,6 +137,10 @@ def handle_achievements():
         return '', 204
 
     init_data_raw = request.headers.get("X-Telegram-Bot-InitData")
+    
+    print("📦 Получен initData:")
+    print(init_data_raw)
+    
     if not init_data_raw or not check_init_data(init_data_raw):
         return jsonify({"error": "Invalid init data"}), 403
 
